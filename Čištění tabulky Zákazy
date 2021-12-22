@@ -1,0 +1,44 @@
+--vytvoreni tabulky Zakazy_firmy: zákazy, které se napojí na ičo
+CREATE OR REPLACE TABLE ZAKAZY_FIRMY AS
+SELECT
+    DISTINCT Z."Id_zakazu"::INT AS "ZF_Id_zakazu"
+    , Z."ID_kontroly" ::INT AS "ZF_ID_kontroly"
+    , Z."Sortiment" AS "ZF_Sortiment"
+    , CASE
+        WHEN Z."Mnozstvi" <> '' THEN (REPLACE(Z."Mnozstvi", ';', '.'))::FLOAT
+        ELSE NULL
+       END AS "ZF_Mnozstvi"
+    , Z."Jednotka" AS "ZF_Jednotka"
+    , CASE
+        WHEN Z."Cena_celkem" <> '' THEN (REPLACE(Z."Cena_celkem", ';', '.'))::FLOAT
+        ELSE NULL
+       END AS "ZF_Cena_celkem"
+    , Z."Dle_zakona" AS "ZF_Dle_zakona"
+    , K."IC_subjektu" AS "ZF_IC_subjektu"
+    , K. "Firma" AS "ZF_Firma"
+FROM "COI_zakazy" AS Z
+LEFT JOIN "KONTROLY" AS K
+ON Z."ID_kontroly" = K."Id_kontroly" where K."IC_subjektu" is NOT null;
+
+--opravuji jeden radek, kde cena zaporna
+UPDATE ZAKAZY_FIRMY SET
+    "ZF_Cena_celkem" = 0
+WHERE "ZF_Cena_celkem" < 0;
+
+--odmazavam radky, ktere se nenapoji na kontroly
+DELETE FROM ZAKAZY_FIRMY 
+WHERE "ZF_ID_kontroly" IN (SELECT "ZF_ID_kontroly" 
+FROM KONTROLY AS K
+FULL OUTER JOIN ZAKAZY_FIRMY AS Z
+ON K."Id_kontroly" = Z."ZF_ID_kontroly"
+WHERE K."Id_kontroly" IS NULL);
+
+SELECT "ZF_Sortiment", "ZF_IC_subjektu", "ZF_Firma" FROM "ZAKAZY_FIRMY"  WHERE "ZF_Firma" is null order by "ZF_Firma" desc;
+
+SELECT "ZF_Sortiment", "ZF_Firma"  FROM "ZAKAZY_FIRMY" WHERE "ZF_Firma" is null or "ZF_Firma" ='' order by "ZF_Firma" asc;
+
+--odstraneni radku bez firmy
+DELETE FROM ZAKAZY_FIRMY 
+WHERE "ZF_Firma" is null or "ZF_Firma" ='';
+
+SELECT "ZF_Sortiment", * FROM "ZAKAZY_FIRMY" where "ZF_Sortiment" ilike 'A%';
