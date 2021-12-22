@@ -1,0 +1,32 @@
+CREATE OR REPLACE TABLE ZAKAZY AS
+SELECT
+    DISTINCT Z."Id_zakazu"::INT AS "Id_zakazu"
+    , Z."ID_kontroly" ::INT AS "ID_kontroly"
+    , Z."Sortiment"
+    , CASE
+        WHEN Z."Mnozstvi" <> '' THEN (REPLACE(Z."Mnozstvi", ';', '.'))::FLOAT
+        ELSE NULL
+       END AS "Mnozstvi"
+    , Z."Jednotka"
+    , CASE
+        WHEN Z."Cena_celkem" <> '' THEN (REPLACE(Z."Cena_celkem", ';', '.'))::FLOAT
+        ELSE NULL
+       END AS "Cena_celkem"
+    , Z."Dle_zakona"
+    , U."URL" AS "URL_zakazy"
+FROM "COI_zakazy" AS Z
+LEFT JOIN "url-zakazy-list-1" AS U
+ON Z."Dle_zakona" = U."Cislo";
+
+--opravuji jeden radek, kde cena zaporna
+UPDATE ZAKAZY SET
+    "Cena_celkem" = 0
+WHERE "Cena_celkem" < 0;
+
+--odmazavam radky, ktere se nenapoji na kontroly
+DELETE FROM ZAKAZY 
+WHERE "ID_kontroly" IN (SELECT "ID_kontroly" 
+FROM KONTROLY AS K
+FULL OUTER JOIN ZAKAZY AS Z
+ON K."Id_kontroly" = Z."ID_kontroly"
+WHERE "Id_kontroly" IS NULL);
