@@ -1,0 +1,41 @@
+CREATE or REPLACE TABLE DATA_CLEAN AS
+SELECT
+    K."Id_kontroly"
+    ,K."Datum_kontroly"
+    ,K."IC_subjektu"
+    ,K."Firma"
+    ,K."Forma_subjektu"
+--    ,K."Datum_vzniku_firmy"
+--    ,K."Rok_vzniku_firmy"
+--   ,K."Datum_zaniku_firmy"
+    ,K."Kraj"
+--    ,K."Okres"
+    ,K."Obec"
+    ,K."Obec2"
+    ,K."Adresa"
+    ,CASE
+    		WHEN K."PSC" <> '' THEN K."PSC"::INT
+        ELSE NULL
+      END AS "PSC"
+--    ,K."Zeme"
+    ,S."Id_Sankce"
+    ,S."Vyse_pokuty"
+    ,S."Zakon"
+    ,S."S"
+    ,S."URL_sankce"
+    ,S."Datum_nabyti_pravni_moci"
+    ,Z."Id_zakazu"
+    ,Z."Sortiment"
+    ,Z."Mnozstvi"
+    ,Z."Jednotka"
+    ,Z."Cena_celkem"
+    ,Z."Dle_zakona"
+    ,Z."URL_zakazy"
+FROM KONTROLY AS K
+LEFT JOIN SANKCE AS S
+ON K."Id_kontroly" = S."ID_kontroly"
+LEFT JOIN ZAKAZY AS Z
+ON K."Id_kontroly" = Z."ID_kontroly";
+
+DELETE FROM DATA_CLEAN
+WHERE "IC_subjektu" IS NULL AND "Kraj" ILIKE 'Neznám%' AND "Id_Sankce" IS NULL AND "Id_zakazu" IS NULL;
