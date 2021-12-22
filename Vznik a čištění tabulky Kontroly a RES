@@ -1,0 +1,751 @@
+-- tabulka RES:
+--přidání sloupců: "Datum_vzniku" a "Datum_zaniku" s datovým typem DATE 
+
+ALTER TABLE RES ADD column "Datum_vzniku" DATE;
+
+ALTER TABLE RES ADD column "Datum_zaniku" DATE;
+
+--naplnění nových sloupců hodnotami (ze sloupců DDATVZN a DDATZAN), prázdná buňka nahrazena "9999-09-09"
+UPDATE RES set 
+"Datum_vzniku" = (
+CASE WHEN "DDATVZN"='' THEN NULL
+ELSE "DDATVZN"
+END);
+
+UPDATE RES set 
+"Datum_zaniku"=(
+CASE WHEN "DDATZAN"='' THEN NULL
+ELSE "DDATZAN"
+END);
+
+--novy sloupec rok vzniku firmy
+
+ALTER TABLE RES ADD column "Rok_vzniku" INT;
+
+UPDATE RES set "Rok_vzniku"= (SELECT YEAR("Datum_vzniku"));
+
+--KONTROLA původní tabulky COI_kontroly:
+---------------------------------------------------------------------------------------------------------
+--KONTROLY:
+-- vytvarim pomocnou tabulku KONTROLY z původní tabulky COI_kontroly
+-- duplicity osetrim pomocí prikazu DISTINCT "Id_kontroly"
+-- datum prevadim na univerzalni format
+CREATE OR REPLACE TABLE KONTROLY AS
+SELECT
+   DISTINCT K."Id_kontroly"::INT AS "Id_kontroly"
+    , TO_DATE(K."Datum_kontroly", 'dd.mm.yyyy') as "Datum_kontroly" 
+    , CASE
+        WHEN K."IC_subjektu" <> '' THEN K."IC_subjektu"::INT
+        ELSE NULL
+        END AS "IC_subjektu"
+    , R."FIRMA" AS "Firma"
+--    , R."Datum_vzniku" AS "Datum_vzniku_firmy"
+--    , R."Rok_vzniku" AS "Rok_vzniku_firmy"
+--    , R."Datum_zaniku" AS "Datum_zaniku_firmy"
+    , K."Kraj" 
+--    , "Okres" 
+    , K."Obec" 
+    , K."Ulice" 
+    , K."C_popisne"
+    , K."C_orientacni"
+    , K."PSC"
+FROM "COI_Kontroly" AS K
+LEFT JOIN "RES" AS R
+ON K."IC_subjektu" = R."ICO";
+
+--pridavam pomocný sloupec Obec2, kam nalijeme hodnoty před pomlčkou
+ALTER TABLE KONTROLY ADD COLUMN "Obec2" VARCHAR;
+
+--rozdeluji Obce s pomlckou v názvu a nechávám pouze první část
+UPDATE KONTROLY SET
+"Obec2" = (IFF("Obec" <> 'Frýdek-Místek', (SPLIT_PART("Obec", '-', 1)), 'Frýdek-Místek'));
+
+--oprava ICO
+UPDATE KONTROLY SET
+"IC_subjektu" = '00000582'
+WHERE "IC_subjektu" = '582';
+
+UPDATE KONTROLY SET
+"IC_subjektu" = '00000205'
+WHERE "IC_subjektu" = '205';
+
+UPDATE KONTROLY SET
+"IC_subjektu" = '0000078'
+WHERE "IC_subjektu" = '78';
+
+--vytvarim pomocny sloupec forma subjektu
+ALTER TABLE KONTROLY ADD "Forma_subjektu" VARCHAR;
+
+UPDATE KONTROLY SET
+"Forma_subjektu" = (IFF("IC_subjektu" IS NOT NULL, 'Právnická osoba', 'Fyzická osoba'));
+
+--oprava ulic
+UPDATE KONTROLY SET
+ "Ulice" = (
+    CASE
+        WHEN "Ulice" = 'Po?tovní 595/7' THEN 'Poštovní 595/7'
+        WHEN "Ulice" = 'Kobli?ná 35/15' THEN 'Kobližná 35/15'
+        WHEN "Ulice" = 'Nádra?ní 287' THEN 'Nádražní 287'
+        WHEN "Ulice" = 'Podkru?nohorská' THEN 'Podkrušnohorská'
+  WHEN "Ulice" = '?i?kova třída 180/13' THEN 'Žižkova třída 180/13'
+  WHEN "Ulice" = 'Tě?nov 1162/9' THEN 'Těšnov 1162/9'
+  WHEN "Ulice" = 'Strá?nická 3657' THEN 'Strášnická 3657'
+  WHEN "Ulice" = '?imonova 1101/10' THEN 'Šimonova 1101/10'
+  WHEN "Ulice" = 'Jana ?vermy 13' THEN 'Jana Švermy 13'
+  WHEN "Ulice" = 'U lu?ického semináře 110/40' THEN 'U lužického semináře 110/40'
+  WHEN "Ulice" = 'Rů?ová 950/15' THEN 'Růžová 950/15'
+  WHEN "Ulice" = 'Libu?ina 1009' THEN 'Libušina 1009'
+  WHEN "Ulice" = 'Le?etínská 625/42' THEN 'Lešetínská 625/42'
+  WHEN "Ulice" = 'Lod?ská 399/26' THEN 'Lodžská 399/26'
+  WHEN "Ulice" = 'Podkru?nohorská' THEN 'Podkrušnohorská'
+  WHEN "Ulice" = 'Lod?ská 850/6' THEN 'Lodžská 850/6'
+  WHEN "Ulice" = 'U Staré po?ty 53' THEN 'U Staré pošty 53'
+  WHEN "Ulice" = 'třída Tomá?e Bati 174' THEN 'třída Tomáše Bati 174'
+  WHEN "Ulice" = 'Tě?ební 1238/2' THEN 'Těžební 1238/2'
+  WHEN "Ulice" = '?vantlova 144/2' THEN 'Švantlova 144/2'
+  WHEN "Ulice" = 'Nádra?ní 287' THEN 'Nádražní 287'
+  WHEN "Ulice" = 'Pra?ská' THEN 'Pražská'
+  WHEN "Ulice" = 'Lod?ská 399/26' THEN 'Lodžská 399/26'
+  WHEN "Ulice" = '?eříková 274/31' THEN 'Śeříková 274/31'
+  WHEN "Ulice" = 'Pra?ská 1417' THEN 'Pražská 1417'
+  WHEN "Ulice" = 'tř. Tomá?e Bati 1720' THEN 'tř. Tomáše Bati 1720'
+  WHEN "Ulice" = 'Vla?ská 349/15' THEN 'Vlašská 349/15'
+  WHEN "Ulice" = 'Barto?kova 1368/4' THEN 'Bartoškova 1368/4'
+  WHEN "Ulice" = 'Le?etínská 625/42' THEN 'Lešetínská 625/42'
+  WHEN "Ulice" = 'U Koupali?tě 348' THEN 'U Koupaliště 348'
+	ELSE "Ulice"
+    END );
+
+UPDATE KONTROLY
+SET "Ulice" = 'Pražská'
+WHERE "Id_kontroly" = '251402100021702';
+
+--oprava podle PSC u nejcasteji se vyskytujicich PSC v radcich s "Kraj neznamy"
+UPDATE KONTROLY SET
+"Kraj" = (
+    CASE
+        WHEN "PSC" = '60200' THEN 'Jihomoravský kraj'
+        WHEN "PSC" = '11000' THEN 'Hlavní město Praha'
+        WHEN "PSC" = '10000' THEN 'Hlavní město Praha'
+        WHEN "PSC" = '13000' THEN 'Hlavní město Praha'
+        WHEN "PSC" = '17000' THEN 'Hlavní město Praha'
+        WHEN "PSC" = '11800' THEN 'Hlavní město Praha'
+        WHEN "PSC" = '50303' THEN 'Královéhradecký kraj'
+        WHEN "PSC" = '27601' THEN 'Středočeský kraj'
+        WHEN "PSC" = '46604' THEN 'Liberecký kraj'
+        WHEN "PSC" = '15500' THEN 'Hlavní město Praha' 
+        WHEN "PSC" = '39001' THEN 'Jihočeský kraj' 
+        WHEN "PSC" = '16000' THEN 'Hlavní město Praha' 
+        WHEN "PSC" = '59202' THEN 'Kraj Vysočina'
+        WHEN "PSC" = '51101' THEN 'Liberecký kraj'
+        WHEN "PSC" = '54221' THEN 'Královéhradecký kraj'
+        WHEN "PSC" = '39002' THEN 'Jihočeský kraj'
+        WHEN "PSC" = '07101' THEN 'Košický kraj'
+        WHEN "PSC" = '47001' THEN 'Liberecký kraj'
+        WHEN "PSC" = '68301' THEN 'Jihomoravský kraj'
+        WHEN "PSC" = '46005' THEN 'Liberecký kraj'
+        WHEN "PSC" = '35601' THEN 'Karlovarský kraj'
+        WHEN "PSC" = '50012' THEN 'Královéhradecký kraj'
+        WHEN "PSC" = '39301' THEN 'Kraj Vysočina'
+        WHEN "PSC" = '16900' THEN 'Hlavní město Praha'
+        WHEN "PSC" = '68604' THEN 'Zlínský kraj'
+        WHEN "PSC" = '58601' THEN 'Kraj Vysočina' 
+        WHEN "PSC" = '70900' THEN 'Moravskoslezský kraj'
+        WHEN "PSC" = '624 0' THEN 'Hlavní město Praha'
+        WHEN "PSC" = '46334' THEN 'Liberecký kraj'
+        WHEN "PSC" = '10600' THEN 'Hlavní město Praha'
+        WHEN "PSC" = '12000' THEN 'Hlavní město Praha'
+        WHEN "PSC" = '38901' THEN 'Jihočeský kraj'
+        WHEN "PSC" = '39901' THEN 'Jihočeský kraj'
+        WHEN "PSC" = '46843' THEN 'Liberecký kraj'
+        WHEN "PSC" = '73601' THEN 'Moravskoslezský kraj'
+        WHEN "PSC" = '39601' THEN 'Kraj Vysočina'
+        WHEN "PSC" = '59231' THEN 'Kraj Vysočina'
+        WHEN "PSC" = '38241' THEN 'Jihočeský kraj'
+        WHEN "PSC" = '69188' THEN 'Jihomoravský kraj'
+        WHEN "PSC" = '11304' THEN 'Hlavní město Praha'
+        WHEN "PSC" = 'E173B' THEN 'London'
+        WHEN "PSC" = '85101' THEN 'Bratislavský kraj'
+        WHEN "PSC" = '80339' THEN 'Mnichov'
+        WHEN "PSC" = '50002' THEN 'Královéhradecký kraj'
+        WHEN "PSC" = '66451' THEN 'Jihomoravský kraj'
+        WHEN "PSC" = '25064' THEN 'Hlavní město Praha'
+        WHEN "PSC" = '38411' THEN 'Jihočeský kraj'
+        WHEN "PSC" = '25601' THEN 'Středočeský kraj'
+        WHEN "PSC" = '61900' THEN 'Jihomoravský kraj'
+        WHEN "PSC" = '46812' THEN 'Liberecký kraj'
+        WHEN "PSC" = '65124' THEN 'Libušské vojvodství'
+        WHEN "PSC" = '190 0' THEN 'Hlavní město Praha'
+        WHEN "PSC" = '75501' THEN 'Zlínský kraj'
+        WHEN "PSC" = '91105' THEN 'Trenčianský kraj'
+        WHEN "PSC" = '53901' THEN 'Pardubický kraj'
+        WHEN "PSC" = '19000' THEN 'Hlavní město Praha'
+        WHEN "PSC" = '70030' THEN 'Moravskoslezský kraj'
+        WHEN "PSC" = '39804' THEN 'Jihočeský kraj'
+        WHEN "PSC" = '54242' THEN 'Královéhradecký kraj'
+        WHEN "PSC" = '54455' THEN 'Královéhradecký kraj'
+        WHEN "PSC" = '53701' THEN 'Pardubický kraj'
+        WHEN "PSC" = '29301' THEN 'Středočeský kraj'
+        WHEN "PSC" = '59401' THEN 'Kraj Vysočina'
+        WHEN "PSC" = '41145' THEN 'Ústecký kraj'
+        WHEN "PSC" = '38601' THEN 'Jihočeský kraj'
+        WHEN "PSC" = '15000' THEN 'Hlavní město Praha'
+        WHEN "PSC" = '73531' THEN 'Moravskoslezský kraj'
+        WHEN "PSC" = '26701' THEN 'Středočeský kraj'
+        WHEN "PSC" = '37701' THEN 'Jihočeský kraj'
+        WHEN "PSC" = '14000' THEN 'Hlavní město Praha'
+        WHEN "PSC" = '28002' THEN 'Středočeský kraj'
+        WHEN "PSC" = '40003' THEN 'Ústecký kraj'
+        WHEN "PSC" = '54954' THEN 'Královéhradecký kraj'
+        WHEN "PSC" = '55001' THEN 'Královéhradecký kraj'
+        WHEN "PSC" = '74706' THEN 'Moravskoslezský kraj'
+        WHEN "PSC" = '38501' THEN 'Jihočeský kraj'
+  			WHEN "PSC" = '39201' THEN 'Jihočeský kraj'
+	ELSE "Kraj"
+    END )
+WHERE "Kraj" ILIKE 'Neznám%';
+
+--opravuji zbyle nezname kraje
+UPDATE KONTROLY
+SET "Kraj" = 'Liberecký kraj'
+    , "Obec2" = 'Liberec'
+WHERE "Id_kontroly" = '251709150025501';
+
+UPDATE KONTROLY
+SET "Kraj" = 'Liberecký kraj'
+    , "Obec2" = 'Hrabětice'
+    , "PSC" = '46811'
+WHERE "Id_kontroly" = '251702280008901';
+
+UPDATE KONTROLY
+SET "Kraj" = 'Liberecký kraj'
+    , "Obec2" = 'Liberec'
+WHERE "Id_kontroly" = '251706010008901';
+
+--opravuji Vysočina na Kraj Vysočina
+UPDATE KONTROLY SET
+"Kraj" = 'Kraj Vysočina'
+WHERE "Kraj" ILIKE '%Vysočina%';
+
+--opravuji radky, kde neznama obec, prestoze PSC vyplnene
+UPDATE KONTROLY SET
+    "Obec2" = (
+    CASE
+        WHEN "PSC" = '60200' THEN 'Brno'
+        WHEN "PSC" = '11000' THEN 'Praha'
+        WHEN "PSC" = '10000' THEN 'Praha'
+        WHEN "PSC" = '13000' THEN 'Praha'
+        WHEN "PSC" = '17000' THEN 'Praha'
+        WHEN "PSC" = '11800' THEN 'Praha'
+        WHEN "PSC" = '27601' THEN 'Mělník'
+        WHEN "PSC" = '46604' THEN 'Jablonec nad Nisou'
+        WHEN "PSC" = '15500' THEN 'Praha' 
+        WHEN "PSC" = '39001' THEN 'Tábor' 
+        WHEN "PSC" = '16000' THEN 'Praha' 
+        WHEN "PSC" = '59202' THEN 'Svratka'
+        WHEN "PSC" = '51101' THEN 'Turnov'
+        WHEN "PSC" = '54221' THEN 'Pec pod Sněžkou'
+        WHEN "PSC" = '39002' THEN 'Tábor'
+        WHEN "PSC" = '07101' THEN 'Michalovce'
+        WHEN "PSC" = '47001' THEN 'Česká Lípa'
+        WHEN "PSC" = '68301' THEN 'Rousínov'
+        WHEN "PSC" = '46005' THEN 'Liberec'
+        WHEN "PSC" = '35601' THEN 'Sokolov'
+        WHEN "PSC" = '50012' THEN 'Hradec Králové'
+        WHEN "PSC" = '39301' THEN 'Pelhřimov'
+        WHEN "PSC" = '16900' THEN 'Praha'
+        WHEN "PSC" = '68604' THEN 'Kunovice'
+        WHEN "PSC" = '58601' THEN 'Jihlava' 
+        WHEN "PSC" = '70900' THEN 'Ostrava'
+        WHEN "PSC" = '624 0' THEN 'Praha'
+        WHEN "PSC" = '46334' THEN 'Hrádek nad Nisou'
+        WHEN "PSC" = '10600' THEN 'Praha'
+        WHEN "PSC" = '12000' THEN 'Praha'
+        WHEN "PSC" = '38901' THEN 'Vodňany'
+        WHEN "PSC" = '39901' THEN 'Milevsko'
+        WHEN "PSC" = '46843' THEN 'Albrechtice v Jizerských horách'
+        WHEN "PSC" = '73601' THEN 'Havířov'
+        WHEN "PSC" = '39601' THEN 'Humpolec'
+        WHEN "PSC" = '59231' THEN 'Nové Město na Moravě'
+        WHEN "PSC" = '38241' THEN 'Kaplice'
+        WHEN "PSC" = '69188' THEN 'Milovice'
+        WHEN "PSC" = '11304' THEN 'Praha'
+        WHEN "PSC" = 'E173B' THEN 'Church Hill'
+        WHEN "PSC" = '85101' THEN 'Petržalka'
+        WHEN "PSC" = '80339' THEN 'Mnichov'
+        WHEN "PSC" = '50002' THEN 'Hradec Králové'
+        WHEN "PSC" = '66451' THEN 'Šlapanice'
+        WHEN "PSC" = '25064' THEN 'Měšice'
+        WHEN "PSC" = '38411' THEN 'Netolice'
+        WHEN "PSC" = '25601' THEN 'Benešov'
+        WHEN "PSC" = '61900' THEN 'Brno'
+        WHEN "PSC" = '46812' THEN 'Bedřichov'
+        WHEN "PSC" = '65124' THEN 'Zielona Góra'
+        WHEN "PSC" = '190 0' THEN 'Praha'
+        WHEN "PSC" = '75501' THEN 'Vsetín'
+        WHEN "PSC" = '91105' THEN 'Trenčín'
+        WHEN "PSC" = '53901' THEN 'Hlinsko'
+        WHEN "PSC" = '19000' THEN 'Praha'
+        WHEN "PSC" = '70030' THEN 'Ostrava'
+        WHEN "PSC" = '39804' THEN 'Čimelice'
+        WHEN "PSC" = '54242' THEN 'Pilníkov'
+        WHEN "PSC" = '54455' THEN 'Dubenec'
+        WHEN "PSC" = '53701' THEN 'Chrudim'
+        WHEN "PSC" = '29301' THEN 'Mladá Boleslav'
+        WHEN "PSC" = '59401' THEN 'Velké Meziříčí'
+        WHEN "PSC" = '41145' THEN 'Úštěk'
+        WHEN "PSC" = '38601' THEN 'Strakonice'
+        WHEN "PSC" = '15000' THEN 'Praha'
+        WHEN "PSC" = '73531' THEN 'Bohumín'
+        WHEN "PSC" = '26701' THEN 'Králův Dvůr u Berouna'
+        WHEN "PSC" = '37701' THEN 'Jindřichův Hradec'
+        WHEN "PSC" = '14000' THEN 'Praha'
+        WHEN "PSC" = '28002' THEN 'Kolín'
+        WHEN "PSC" = '40003' THEN 'Ústí nad Labem'
+        WHEN "PSC" = '54954' THEN 'Police nad Metují'
+        WHEN "PSC" = '55001' THEN 'Broumov'
+        WHEN "PSC" = '74706' THEN 'Opava'
+        WHEN "PSC" = '38501' THEN 'Vimperk'
+      	WHEN "PSC" = '39201' THEN 'Soběslav'
+	ELSE "Obec"
+    END )
+WHERE "Obec" ILIKE 'Neznám%';
+
+-- Rucni oprava radku:
+UPDATE KONTROLY
+SET "Kraj" = 'Jihomoravský kraj'
+    ,"Obec2" = 'Brno'
+--    ,"Okres" = 'Brno-město'
+    ,"C_popisne" = '479'
+    , "C_orientacni" = '11'
+WHERE "Id_kontroly" = '301703290048301';
+
+--odstranujeme poznamku "stary kod"
+UPDATE KONTROLY SET
+"Obec" = REPLACE("Obec", '(starý kód)', '')
+WHERE "Obec" ILIKE '%starý kód%';
+
+--odstranujeme poznamku "neclenene mesto"
+UPDATE KONTROLY SET
+"Obec" = REPLACE("Obec", '(nečleněné město)', '')
+WHERE "Obec" ILIKE '%nečleněné město%';
+
+--odstranujeme poznamku "(nečleněná část města)"
+UPDATE KONTROLY SET
+"Obec" = REPLACE("Obec", '(nečleněná část města)', '')
+WHERE "Obec" ILIKE '%nečleněná část města%';
+
+--opravuji jeste par chybne vyplnenych PSC
+UPDATE KONTROLY SET
+    "PSC" = (
+    CASE
+        WHEN "PSC" = '624 0' THEN '16200'
+        WHEN "PSC" = '11304' THEN '11000'
+        WHEN "PSC" = '190 0' THEN '19000'
+      	ELSE "PSC"
+    END );
+
+--pridavam sloupec Zeme, protoze par kontrol v zahranici s defaultni hodnotou 'Ceska republika'
+ALTER TABLE KONTROLY ADD ("Zeme" VARCHAR);
+
+UPDATE KONTROLY SET "Zeme" = 'Česká republika';
+
+--oprava PSC
+UPDATE KONTROLY SET
+"PSC" = (
+    CASE
+        WHEN "Obec2" = 'Praha 1' THEN '11000'
+        WHEN "Obec2" = 'Praha 10' THEN '10000'
+        WHEN "Obec2" = 'Praha 11' THEN '10100'
+        WHEN "Obec2" = 'Praha 12' THEN '10200'
+        WHEN "Obec2" = 'Praha 15' THEN '10500'
+        WHEN "Obec2" = 'Praha 12' THEN '12000'
+        WHEN "Obec2" = 'Praha 22' THEN '10400'
+        WHEN "Obec2" = 'Praha 3' THEN '13000'
+        WHEN "Obec2" = 'Praha 4' THEN '14000'
+        WHEN "Obec2" = 'Praha 5' THEN '15000'
+        WHEN "Obec2" = 'Praha 6' THEN '16000'
+        WHEN "Obec2" = 'Praha 7' THEN '17000'
+        WHEN "Obec2" = 'Praha 8' THEN '18000'
+        WHEN "Obec2" = 'Praha 9' THEN '19000'
+  ELSE '11000'
+  END)
+WHERE "Kraj" ILIKE '%Praha%' AND "PSC" NOT ILIKE '1%' AND "PSC" <> '';
+
+UPDATE KONTROLY SET
+"PSC" = '25001'
+WHERE "Kraj" ILIKE '%Středočeský%' AND "PSC" NOT ILIKE '2%' AND "PSC" <> '';
+
+UPDATE KONTROLY SET
+"PSC" = '37001'
+WHERE "Kraj" ILIKE '%Jihočeský%' AND "PSC" NOT ILIKE '3%' AND "PSC" <> '';
+
+UPDATE KONTROLY SET
+"PSC" = (
+  CASE
+    WHEN "PSC" = '34201' THEN '37001'
+    WHEN "PSC" = '34201' THEN '33801'
+  ELSE "PSC" END
+)
+WHERE "Kraj" ILIKE '%Jihočeský%';
+
+UPDATE KONTROLY SET
+"PSC" = '46001'
+WHERE "Kraj" IN ('Liberecký kraj', 'Ústecký kraj') AND "PSC" ILIKE '1%';
+
+UPDATE KONTROLY SET
+"PSC" = '46001'
+WHERE "Kraj" IN ('Liberecký kraj', 'Ústecký kraj') AND "PSC" ILIKE '2%';
+
+UPDATE KONTROLY SET
+"PSC" = '46001'
+WHERE "Kraj" IN ('Liberecký kraj', 'Ústecký kraj') AND "PSC" ILIKE '7%';
+
+UPDATE KONTROLY SET
+"PSC" = '46001'
+WHERE "Kraj" IN ('Liberecký kraj', 'Ústecký kraj') AND "PSC" ILIKE '3%';
+
+UPDATE KONTROLY SET
+"PSC" = '46001'
+WHERE "Kraj" = 'Liberecký kraj' AND "PSC" ILIKE '40%';
+
+UPDATE KONTROLY SET
+"PSC" = '60200'
+WHERE "Kraj" = 'Jihomoravský kraj' AND "PSC" <> '' AND "PSC" NOT ILIKE '6%';
+
+UPDATE KONTROLY SET
+"PSC" = '58601'
+WHERE "Kraj" = 'Kraj Vysočina' AND "PSC" ILIKE '1%';
+
+UPDATE KONTROLY SET
+"PSC" = '58601'
+WHERE "Kraj" = 'Kraj Vysočina' AND "PSC" ILIKE '%38601%';
+
+UPDATE KONTROLY SET
+"PSC" = '58601'
+WHERE "Kraj" = 'Kraj Vysočina' AND "PSC" ILIKE '%51211%';
+
+UPDATE KONTROLY SET
+"PSC" = '58601'
+WHERE "Kraj" = 'Kraj Vysočina' AND "PSC" ILIKE '4%';
+
+UPDATE KONTROLY SET
+"PSC" = '58601'
+WHERE "Kraj" = 'Kraj Vysočina' AND "PSC" ILIKE '%67901%';
+
+UPDATE KONTROLY SET
+"PSC" = '58601'
+WHERE "Kraj" = 'Kraj Vysočina' AND "PSC" ILIKE '7%';
+
+UPDATE KONTROLY SET
+"PSC" = '70030'
+WHERE "Kraj" = 'Moravskoslezský kraj' AND "PSC" <> '' AND "PSC" NOT ILIKE '7%';
+
+UPDATE KONTROLY SET
+"PSC" = '70030'
+WHERE "Kraj" = 'Moravskoslezský kraj' AND "PSC" ILIKE '76%';
+
+UPDATE KONTROLY SET
+"PSC" = '70030'
+WHERE "Kraj" = 'Moravskoslezský kraj' AND "PSC" ILIKE '78%';
+
+UPDATE KONTROLY SET
+"PSC" = '77900'
+WHERE "Kraj" = 'Olomoucký kraj' AND "PSC" <> '' AND "PSC" NOT ILIKE '7%';
+
+UPDATE KONTROLY SET
+"PSC" = '77900'
+WHERE "Kraj" = 'Olomoucký kraj' AND "PSC" ILIKE '74%';
+
+UPDATE KONTROLY SET
+"PSC" = '77900'
+WHERE "Kraj" = 'Olomoucký kraj' AND "PSC" ILIKE '76%';
+
+UPDATE KONTROLY SET
+"PSC" = '77900'
+WHERE "Kraj" = 'Olomoucký kraj' AND "PSC" ILIKE '71%';
+
+UPDATE KONTROLY SET
+"PSC" = '77900'
+WHERE "Kraj" = 'Olomoucký kraj' AND "PSC" = '79383';
+
+UPDATE KONTROLY SET
+"PSC" = '36001'
+WHERE "Kraj" = 'Karlovarský kraj' AND "PSC" <> '' AND "PSC" NOT ILIKE '3%';
+
+UPDATE KONTROLY SET
+"PSC" = '50002'
+WHERE "Kraj" = 'Královéhradecký kraj' AND "PSC" <> '' AND "PSC" NOT ILIKE '5%';
+
+UPDATE KONTROLY SET
+"PSC" = '50002'
+WHERE "Kraj" = 'Královéhradecký kraj' AND "PSC" ILIKE '53%';
+
+UPDATE KONTROLY SET
+"PSC" = '50002'
+WHERE "Kraj" = 'Královéhradecký kraj' AND "PSC" ILIKE '56%';
+
+UPDATE KONTROLY SET
+"PSC" = '53002'
+WHERE "Kraj" = 'Pardubický kraj' AND "PSC" <> '' AND "PSC" NOT ILIKE '5%';
+
+UPDATE KONTROLY SET
+"PSC" = '53002'
+WHERE "Kraj" = 'Pardubický kraj' AND "PSC" ILIKE '50%';
+
+UPDATE KONTROLY SET
+"PSC" = '53002'
+WHERE "Kraj" = 'Pardubický kraj' AND "PSC" ILIKE '55%';
+
+UPDATE KONTROLY SET
+"PSC" = '30100'
+WHERE "Kraj" = 'Plzeňský kraj' AND "PSC" <> '' AND "PSC" NOT ILIKE '3%';
+
+UPDATE KONTROLY SET
+"PSC" = '30100'
+WHERE "Kraj" = 'Plzeňský kraj' AND "PSC" = '35735';
+
+UPDATE KONTROLY SET
+"PSC" = '30100'
+WHERE "Kraj" = 'Plzeňský kraj' AND "PSC" = '38501';
+
+UPDATE KONTROLY SET
+"PSC" = '40001'
+WHERE "Kraj" = 'Ústecký kraj' AND "PSC" = '47001';
+
+UPDATE KONTROLY SET
+"PSC" = '40001'
+WHERE "Kraj" = 'Ústecký kraj' AND "PSC" = '46401';
+
+UPDATE KONTROLY SET
+"PSC" = '40001'
+WHERE "Kraj" = 'Ústecký kraj' AND "PSC" = '46001';
+
+UPDATE KONTROLY SET
+"PSC" = '68601'
+WHERE "Kraj" = 'Zlínský kraj' AND "PSC" ILIKE '1%';
+
+UPDATE KONTROLY SET
+"PSC" = '76001'
+WHERE "Kraj" = 'Zlínský kraj' AND "PSC" ILIKE '3%';
+
+UPDATE KONTROLY SET
+"PSC" = '76001'
+WHERE "Kraj" = 'Zlínský kraj' AND "PSC" ILIKE '5%';
+
+UPDATE KONTROLY SET
+"PSC" = '76001'
+WHERE "Kraj" = 'Zlínský kraj' AND "PSC" ILIKE '69%';
+
+UPDATE KONTROLY SET
+"PSC" = '76001'
+WHERE "Kraj" = 'Zlínský kraj' AND "PSC" = '63900';
+
+UPDATE KONTROLY SET
+"PSC" = '76001'
+WHERE "Kraj" = 'Zlínský kraj' AND "PSC" = '68501';
+
+UPDATE KONTROLY SET
+"PSC" = '76001'
+WHERE "Kraj" = 'Zlínský kraj' AND "PSC" = '68303';
+
+UPDATE KONTROLY SET
+"PSC" = '76001'
+WHERE "Kraj" = 'Zlínský kraj' AND "PSC" = '68201';
+
+UPDATE KONTROLY SET
+"PSC" = '76001'
+WHERE "Kraj" = 'Zlínský kraj' AND "PSC" ILIKE '70%';
+
+UPDATE KONTROLY SET
+"PSC" = '76001'
+WHERE "Kraj" = 'Zlínský kraj' AND "PSC" ILIKE '71%';
+
+UPDATE KONTROLY SET
+"PSC" = '76001'
+WHERE "Kraj" = 'Zlínský kraj' AND "PSC" ILIKE '72%';
+
+--opravuji jeste par chybne vyplnenych PSC
+UPDATE KONTROLY SET
+    "Zeme" = (
+    CASE
+        WHEN "PSC" = '07101' THEN 'Slovensko'
+        WHEN "PSC" = 'E173B' THEN 'Velká Británie'
+        WHEN "PSC" = '85101' THEN 'Slovensko'
+        WHEN "PSC" = '8039' THEN 'Německo'
+        WHEN "PSC" = '65124' THEN 'Polsko'
+        WHEN "PSC" = '91105' THEN 'Slovensko'
+      ELSE "Zeme"
+    END );
+
+--Sloupec pobocky
+--Pobočky
+ALTER TABLE KONTROLY ADD "Pobocky" VARCHAR;
+
+UPDATE KONTROLY SET
+"Pobocky" = ("IC_subjektu"||"Ulice"||"C_popisne"||"C_orientacni"||"PSC"||"Obec2");
+
+--odmazani nepotrebnych radku
+DELETE FROM KONTROLY  
+WHERE "Id_kontroly" = '101810300955505';
+
+DELETE FROM KONTROLY
+WHERE "Zeme" <> 'Česká republika';
+
+DELETE FROM KONTROLY
+WHERE "PSC" ILIKE '%1012%';
+
+DELETE FROM KONTROLY  
+WHERE "Id_kontroly" = '101803200906501';
+
+DELETE FROM KONTROLY
+WHERE "Id_kontroly" = '101905140955503';
+
+UPDATE KONTROLY SET
+"PSC" = '63700'
+WHERE "PSC" ILIKE '%Brno%';
+
+UPDATE KONTROLY SET
+    "PSC" = (REPLACE("PSC", ' ')) 
+WHERE "PSC" ILIKE '% %';
+
+ALTER TABLE KONTROLY ADD ("0" STRING);
+
+UPDATE KONTROLY SET "0" = '0';
+
+UPDATE KONTROLY SET
+"PSC" = (CONCAT("PSC", "0"))
+WHERE LENGTH("PSC") < 5 AND "PSC" <> '';
+
+ALTER TABLE KONTROLY DROP "0";
+
+DELETE FROM KONTROLY 
+WHERE "PSC" ILIKE '0%';
+
+UPDATE KONTROLY SET "PSC" = '46001'
+WHERE "PSC" ILIKE '%|%';
+
+UPDATE KONTROLY SET "PSC" = '68201'
+WHERE "PSC" = 'žáěé+' OR "PSC" = 'žážé+';
+
+UPDATE KONTROLY
+SET "Kraj" = 'Liberecký kraj'
+    , "Obec2" = 'Liberec'
+WHERE "Firma" = 'HA & G FAMILI s.r.o.';
+
+--mazeme hodnoty bez vyznamu
+DELETE FROM KONTROLY
+WHERE "Kraj" ILIKE 'Neznámý%';
+
+--pridavam sloupec adresa
+ALTER TABLE KONTROLY ADD "Adresa" VARCHAR;
+
+UPDATE KONTROLY SET
+"Adresa" = (CONCAT("Ulice", ' ', "C_popisne", ' ', "C_orientacni"));
+
+DELETE FROM KONTROLY 
+WHERE "IC_subjektu" = '2410' 
+OR "IC_subjektu" = '333' 
+OR "IC_subjektu" = '221' 
+OR "IC_subjektu" = '11' 
+OR "IC_subjektu" = '6' 
+OR "IC_subjektu" = '0';
+
+--mazu nepotrebne sloupce
+ALTER TABLE KONTROLY DROP "Ulice";
+
+ALTER TABLE KONTROLY DROP "C_popisne";
+
+ALTER TABLE KONTROLY DROP "C_orientacni";
+
+-------------------------------------------------
+-------------------------------------------------
+--P10
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 10' where "Obec2" ilike 'Prah%' and "PSC" ilike '10%';
+
+UPDATE "KONTROLY" SET "Obec" = 'Praha 10' where "Obec2" ilike 'Prah%' and "PSC" ilike '10%';
+
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 10', "Obec" = 'Praha 10', "PSC" = '10200' where 
+"Id_kontroly" = '101510130041301' or "Id_kontroly" = '101704190038004'  or "Id_kontroly" = '101601040009501' or "Id_kontroly" = '101901300059102';
+
+--P1
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 1', "Obec" = 'Praha 1' where "Obec2" ilike 'Prah%' and "PSC" ilike '11%';
+
+UPDATE "KONTROLY" SET "Obec" = 'Jeneč', "Obec2" = 'Jeneč' where "Id_kontroly" = '101601288902101';
+
+UPDATE "KONTROLY" SET "Obec" = 'Praha 10',"Obec2" = 'Praha 10', "PSC" = '10800' where "Id_kontroly" = '101702210913002';
+
+UPDATE "KONTROLY" SET "Obec" = 'Teplice', "Obec2" = 'Teplice', "PSC" = '41501', "Kraj" = 'Ústecký kraj' where "Id_kontroly" = '101712270047201';
+
+UPDATE "KONTROLY" SET "Obec" = 'Praha 2',"Obec2" = 'Praha 2', "PSC" = '12000' where "Id_kontroly" = '101803010910901';
+
+UPDATE "KONTROLY" SET "Obec" = 'Praha 10', "PSC" = '10000' where "Id_kontroly" = '101708230152899';
+
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 10', "PSC" = '10000' where "Id_kontroly" = '101708230152899';
+
+UPDATE "KONTROLY" SET "Obec" = 'Praha 10', "PSC" = '10200' where "Id_kontroly" = '101510150038301';
+
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 10', "PSC" = '10200' where "Id_kontroly" = '101510150038301';
+
+UPDATE "KONTROLY" SET "Obec" = 'Praha 2', "PSC" = '12000' where "Id_kontroly" = '101407090011303';
+
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 2', "PSC" = '12000' where "Id_kontroly" = '101407090011303';
+
+UPDATE "KONTROLY" SET "Obec" = 'Praha 10',"Obec2" = 'Praha 10', "Adresa" = 'Služeb 609/6', "PSC" = '10800' where "Id_kontroly" = '101603040048001';
+
+--P2
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 2', "Obec" = 'Praha 2' where "Obec2" ilike 'Prah%' and "PSC" ilike '12%';
+
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 3', "Obec" = 'Praha 3', "PSC" = '13000' where "Id_kontroly" = '101812050955502';
+
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 4', "Obec" = 'Praha 4', "PSC" = '14000' where "Id_kontroly" = '101602260011303' or "Id_kontroly" = '101509230038301' 
+or "Id_kontroly" = '101704040011302' or "Id_kontroly" = '101811289907701';
+
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 1', "Obec" = 'Praha 1', "PSC" = '11000' where "Id_kontroly" = '102001090084703' or "Id_kontroly" = '101601200955599'  or "Id_kontroly" = '101601010955501' or "Id_kontroly" = '301710100026350'
+or "Id_kontroly" = '101606030032501' or "Id_kontroly" = '101712010955501' or "Id_kontroly" = '101608090010201' or "Id_kontroly" = '101810100907603';
+
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 10', "Obec" = 'Praha 10', "PSC" = '10200' where "Id_kontroly" = '101711078154401';
+
+UPDATE "KONTROLY" SET "Adresa" = 'Bělehradská 858/23' where "Id_kontroly" = '101601200047201';
+
+--P3
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 3', "Obec" = 'Praha 3' where "Obec2" ilike 'Prah%' and "PSC" ilike '13%';
+
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 1', "Obec" = 'Praha 1', "PSC" = '11000' where 
+"Id_kontroly" = '102008050013604';
+
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 2', "Obec" = 'Praha 2', "PSC" = '12000' where "Adresa" ilike 'Vinohrad%';
+
+select "Adresa", * from "KONTROLY" where "Obec2" not in('Praha 1','Praha 2', 'Praha 3', 'Praha 4', 'Praha 5', 'Praha 6', 'Praha 7', 'Praha 8', 'Praha 9', 'Praha 10')  and "Obec2" ilike 'Prah%';
+
+select "Adresa", * from "KONTROLY" where "Obec2" ilike 'Prah%' and "PSC" ilike '16%' and "Adresa" ilike 'Milady%';
+
+--P4
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 4', "Obec" = 'Praha 4' where "Obec2" ilike 'Prah%' and "PSC" ilike '14%';
+
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 4', "Obec" = 'Praha 4', "PSC" = '14800' where 
+"Id_kontroly" = '101704260038302' or "Id_kontroly" = '101601040009501';
+
+--P5
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 5', "Obec" = 'Praha 5' where "Obec2" ilike 'Prah%' and "PSC" ilike '15%';
+
+--P6
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 5', "Obec" = 'Praha 5' where "Obec2" ilike 'Prah%' and "PSC" ilike '16%';
+
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 9', "Obec" = 'Praha 9', "PSC" = '19300' where 
+"Adresa" = 'Chlumec%';
+
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 7', "Obec" = 'Praha 7', "PSC" = '17000' where 
+"Adresa" = 'Milady%';
+
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 5', "Obec" = 'Praha 5', "PSC" = '15000' where 
+"Adresa" = 'Janáčkovo%';
+
+--P7
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 7', "Obec" = 'Praha 7' where "Obec2" ilike 'Prah%' and "PSC" ilike '17%';
+
+--P8
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 8', "Obec" = 'Praha 8' where "Obec2" ilike 'Prah%' and "PSC" ilike '18%';
+
+--P9
+UPDATE "KONTROLY" SET "Obec2" = 'Praha 9', "Obec" = 'Praha 9' where "Obec2" ilike 'Prah%' and "PSC" ilike '19%';
