@@ -1,0 +1,24 @@
+ALTER TABLE RES ADD column "Datum_vzniku" DATE;
+
+ALTER TABLE RES ADD column "Datum_zaniku" DATE;
+
+--naplnění nových sloupců hodnotami (ze sloupců DDATVZN a DDATZAN)
+UPDATE RES set 
+"Datum_vzniku" = (
+CASE WHEN "DDATVZN"='' THEN NULL
+ELSE "DDATVZN"
+END);
+
+UPDATE RES set 
+"Datum_zaniku"=(
+CASE WHEN "DDATZAN"='' THEN NULL
+ELSE "DDATZAN"
+END);
+
+CREATE TABLE RES_CLEAN AS 
+SELECT
+    "ICO"
+    ,"FIRMA"
+    ,"Datum_vzniku"
+    ,"Datum_zaniku"
+FROM RES;
