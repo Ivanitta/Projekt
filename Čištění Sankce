@@ -1,0 +1,27 @@
+--------------------------------------------------------------------------------------------------------------
+--SANKCE
+-- vytvarim pomocnou tabulku SANKCE z původní tabulky COI_sankce
+-- duplicity osetrim pomocí prikazu DISTINCT "Id_Sankce"
+-- datum prevadim na univerzalni format
+--ciselne hodnoty prevadime na INT
+
+CREATE TABLE SANKCE AS
+SELECT
+    DISTINCT S."Id_Sankce"::INT AS "Id_Sankce"
+    , S."ID_kontroly"::INT AS "ID_kontroly"
+    , S."Vyse_pokuty"::INT AS "Vyse_pokuty"
+    , S."Zakon"
+    , S."S" 
+    , U."URL" AS "URL_sankce"
+    , TO_DATE(S."Datum_nabyti_Pravni_Moci", 'dd.mm.yyyy') as "Datum_nabyti_pravni_moci"
+FROM "COI_sankce" AS S
+LEFT JOIN "url-sankce-list-1" AS U
+ON S."Zakon" = U."Cislo";
+
+--odmazavam radky, ktere se nenapoji na kontroly
+DELETE FROM SANKCE 
+WHERE "ID_kontroly" IN (SELECT "ID_kontroly" 
+FROM KONTROLY AS K
+FULL OUTER JOIN SANKCE AS S
+ON K."Id_kontroly" = S."ID_kontroly"
+WHERE "Id_kontroly" IS NULL);
